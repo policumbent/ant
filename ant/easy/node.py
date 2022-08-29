@@ -41,14 +41,16 @@ _logger = logging.getLogger("ant.easy.node")
 
 
 class Node:
-    def __init__(self):
-
+    def __init__(self, network=None, key=None):
         self._responses_cond = threading.Condition()
         self._responses = collections.deque()
         self._event_cond = threading.Condition()
         self._events = collections.deque()
 
         self._datas = queue.Queue()
+
+        self._network = network
+        self._key = key
 
         self.channels = {}
 
@@ -58,6 +60,18 @@ class Node:
 
         self._worker_thread = threading.Thread(target=self._worker, name="ant.easy")
         self._worker_thread.start()
+
+    def __enter__(self):
+        if self._network is None or self._key is None:
+            raise KeyError
+
+        self.set_network_key(self._network, self._key)
+
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        # In this block of code no exception handling is performed so the exceptions are propagated
+        self.stop()
 
     def new_channel(self, ctype, network_number=0x00, ext_assign=None):
         size = len(self.channels)
