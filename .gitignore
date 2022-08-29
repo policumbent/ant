@@ -12,3 +12,7 @@ dist/
 .coverage
 venv/
 settings.json
+.venv
+**/__pycache*
+*.lock
+.pytest_*

@@ -1,6 +1,27 @@
+[tool.poetry]
+name = "policumbent-ant"
+version = "0.4.0"
+description = "ANT and ANT-FS Python Library (openant fork)"
+authors = ["Gabriele Belluardo <gabriele.belluardo@outlook.it>", "Gustav Tiger <gustav@tiger.name>"]
+license = "LGPL-3.0-or-later"
+packages = [
+    { include = "ant" },
+    { include = "ant/**/*.py" },
+]
+exclude = ["ant/tests"]
+
+[tool.poetry.dependencies]
+python = "^3.7"
+pyusb = ">=1.0a2"
+
+[tool.poetry.dev-dependencies]
+pylint = "^2.12.2"
+pytest = "^7.1.2"
+black = "^22.3.0"
+
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["setuptools", "poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 88
