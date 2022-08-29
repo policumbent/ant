@@ -1,25 +1,4 @@
-# Ant
-#
-# Copyright (c) 2012, Gustav Tiger <gustav@tiger.name>
-#
-# Permission is hereby granted, free of charge, to any person obtaining a
-# copy of this software and associated documentation files (the "Software"),
-# to deal in the Software without restriction, including without limitation
-# the rights to use, copy, modify, merge, publish, distribute, sublicense,
-# and/or sell copies of the Software, and to permit persons to whom the
-# Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-# DEALINGS IN THE SOFTWARE.
-
+from __future__ import absolute_import, print_function
 
 import array
 import logging
@@ -81,6 +60,7 @@ class Message:
         # Notifications
         STARTUP_MESSAGE = 0x6F
         SERIAL_ERROR_MESSAGE = 0xAE
+        EVENT_CHANNEL_CLOSED = 0x07
 
         # Control messags
         RESET_SYSTEM = 0x4A
@@ -116,9 +96,9 @@ class Message:
         TEST_MODE_CW_TEST = 0x48
 
         # Extended data messages (legacy)
-        LEGACY_EXTENDED_BROADCAST_DATA = 0x5D
-        LEGACY_EXTENDED_ACKNOWLEDGED_DATA = 0x5E
-        LEGACY_EXTENDED_BURST_DATA = 0x5F
+        LEGACY_EXTENDED_BROADCAST_DATA = 0x5d
+        LEGACY_EXTENDED_ACKNOWLEDGED_DATA = 0x5e
+        LEGACY_EXTENDED_BURST_DATA = 0x5f
 
     class Code:
         RESPONSE_NO_ERROR = 0
@@ -173,26 +153,21 @@ class Message:
                     return key
 
     def __init__(self, mId, data):
-        self._sync = 0xA4
+        self._sync = 0xa4
         self._length = len(data)
         self._id = mId
         self._data = data
-        self._checksum = (
-            self._sync ^ self._length ^ self._id ^ reduce(lambda x, y: x ^ y, data)
-        )
+        self._checksum = (self._sync ^ self._length ^ self._id
+                          ^ reduce(lambda x, y: x ^ y, data))
 
     def __repr__(self):
         return str.format(
             "<ant.base.Message {0:02x}:{1} (s:{2:02x}, l:{3}, c:{4:02x})>",
-            self._id,
-            format_list(self._data),
-            self._sync,
-            self._length,
-            self._checksum,
-        )
+            self._id, format_list(self._data), self._sync,
+            self._length, self._checksum)
 
     def get(self):
-        result = array.array("B", [self._sync, self._length, self._id])
+        result = array.array('B', [self._sync, self._length, self._id])
         result.extend(self._data)
         result.append(self._checksum)
         return result
@@ -208,8 +183,28 @@ class Message:
         data = buf[3:-1]
         checksum = buf[-1]
 
-        assert sync == 0xA4
+        if sync != 0xa4:
+            print("ERRORE: Sync diverso da 0xa4")
+            _logger.error("ERRORE: Sync diverso da 0xa4")
+            print("Sync: " + str(sync))
+            _logger.warning("Sync: " + str(sync))
+            print("mId: " + str(mId))
+            _logger.warning("mId: " + str(mId))
+        assert sync == 0xa4
+
+        # TODO gestione dell'errore:
+        # se il checksum non è corretto o il codice sync non è
+        # corretto crasha documentarsi e risolvere il probelma
+
         assert length == len(data)
+        if checksum != reduce(lambda x, y: x ^ y, buf[:-1]):
+            _logger.error("Checksum non corretto")
+            print("ERRORE: Checksum non corretto")
+            print(data)
+            _logger.warning("DATA: " + str(data))
+            print("mId: " + str(mId))
+            _logger.warning("mId: " + str(mId))
+            # print("Errore: reduce")
         assert checksum == reduce(lambda x, y: x ^ y, buf[:-1])
 
         return Message(mId, data)

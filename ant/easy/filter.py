@@ -1,30 +1,9 @@
-# Ant
-#
-# Copyright (c) 2012, Gustav Tiger <gustav@tiger.name>
-#
-# Permission is hereby granted, free of charge, to any person obtaining a
-# copy of this software and associated documentation files (the "Software"),
-# to deal in the Software without restriction, including without limitation
-# the rights to use, copy, modify, merge, publish, distribute, sublicense,
-# and/or sell copies of the Software, and to permit persons to whom the
-# Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-# DEALINGS IN THE SOFTWARE.
-
+from __future__ import absolute_import, print_function
 
 import logging
 
-from ant.base.message import Message
-from ant.easy.exception import AntException, TransferFailedException
+from ..base.message import Message
+from ..easy.exception import AntException, TransferFailedException
 
 _logger = logging.getLogger("ant.easy.filter")
 
@@ -47,10 +26,8 @@ def wait_for_message(match, process, queue, condition):
                 queue.remove(message)
                 condition.release()
                 return process(message)
-            elif message[1] == 1 and message[2][0] in [
-                Message.Code.EVENT_TRANSFER_TX_FAILED,
-                Message.Code.EVENT_RX_FAIL_GO_TO_SEARCH,
-            ]:
+            elif message[1] == 1 and message[2][0] in [Message.Code.EVENT_TRANSFER_TX_FAILED,
+                                                       Message.Code.EVENT_RX_FAIL_GO_TO_SEARCH]:
                 _logger.warning("Transfer send failed:")
                 _logger.warning(message)
                 queue.remove(message)
@@ -88,12 +65,8 @@ def wait_for_response(event_id, queue, condition):
         if data[0] == Message.Code.RESPONSE_NO_ERROR:
             return params
         else:
-            raise Exception(
-                "Responded with error "
-                + str(data[0])
-                + ":"
-                + Message.Code.lookup(data[0])
-            )
+            raise Exception("Responded with error " + str(data[0])
+                            + ":" + Message.Code.lookup(data[0]))
 
     return wait_for_message(match, process, queue, condition)
 

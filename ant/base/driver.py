@@ -1,25 +1,4 @@
-# Ant
-#
-# Copyright (c) 2012, Gustav Tiger <gustav@tiger.name>
-#
-# Permission is hereby granted, free of charge, to any person obtaining a
-# copy of this software and associated documentation files (the "Software"),
-# to deal in the Software without restriction, including without limitation
-# the rights to use, copy, modify, merge, publish, distribute, sublicense,
-# and/or sell copies of the Software, and to permit persons to whom the
-# Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-# DEALINGS IN THE SOFTWARE.
-
+from __future__ import absolute_import, print_function
 
 import logging
 
@@ -116,14 +95,14 @@ try:
             print("bytesize:        ", self._serial.bytesize)
             print("parity:          ", self._serial.parity)
             print("stopbits:        ", self._serial.stopbits)
-            print("timeout:         ", self._serial.timeout)
+            print("timeout:         ", self._serial.message_timeout)
             print("writeTimeout:    ", self._serial.writeTimeout)
             print("xonxoff:         ", self._serial.xonxoff)
             print("rtscts:          ", self._serial.rtscts)
             print("dsrdtr:          ", self._serial.dsrdtr)
             print("interCharTimeout:", self._serial.interCharTimeout)
 
-            self._serial.timeout = 0
+            self._serial.message_timeout = 0
 
         def read(self):
             data = self._serial.read(4096)
@@ -148,8 +127,6 @@ except ImportError:
 try:
     import usb.core
     import usb.util
-    from .commons import is_windows
-    import time
 
     class USBDriver(Driver):
         def __init__(self):
@@ -208,12 +185,16 @@ try:
                 _logger.warning(
                     "Could not reset the device, not implemented in usb backend"
                 )
-            if is_windows:
-                time.sleep(2)
 
             # get an endpoint instance
             cfg = dev.get_active_configuration()
-            intf = cfg[(0, 0)]
+            interface_number = cfg[(0, 0)].bInterfaceNumber
+            alternate_setting = usb.control.get_interface(dev, interface_number)
+            intf = usb.util.find_descriptor(
+                cfg,
+                bInterfaceNumber=interface_number,
+                bAlternateSetting=alternate_setting,
+            )
 
             self._out = usb.util.find_descriptor(
                 intf,
@@ -264,10 +245,10 @@ except ImportError:
 
 
 def find_driver():
-    _logger.debug("Driver available:", drivers)
+    # print("Driver available:", drivers)
 
     for driver in reversed(drivers):
         if driver.find():
-            _logger.debug(" - Using:", driver)
+            # print(" - Using:", driver)
             return driver()
     raise DriverNotFound

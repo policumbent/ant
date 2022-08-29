@@ -1,31 +1,18 @@
-# Ant
-#
-# Copyright (c) 2012, Gustav Tiger <gustav@tiger.name>
-#
-# Permission is hereby granted, free of charge, to any person obtaining a
-# copy of this software and associated documentation files (the "Software"),
-# to deal in the Software without restriction, including without limitation
-# the rights to use, copy, modify, merge, publish, distribute, sublicense,
-# and/or sell copies of the Software, and to permit persons to whom the
-# Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-# DEALINGS IN THE SOFTWARE.
+from __future__ import absolute_import, print_function, division
 
 import array
 import collections
 import struct
 import threading
 import time
-import queue
+
+try:
+    # Python 3
+    import queue
+except ImportError:
+    # Python 2
+    import Queue as queue
+
 import logging
 
 import usb.core
@@ -50,9 +37,9 @@ class Ant:
 
         self._events = queue.Queue()
 
-        self._buffer = array.array("B", [])
-        self._burst_data = array.array("B", [])
-        self._last_data = array.array("B", [])
+        self._buffer = array.array('B', [])
+        self._burst_data = array.array('B', [])
+        self._last_data = array.array('B', [])
 
         self._running = True
 
@@ -73,24 +60,12 @@ class Ant:
             self._worker_thread.join()
 
     def _on_broadcast(self, message):
-        self._events.put(
-            (
-                "event",
-                (message._data[0], Message.Code.EVENT_RX_BROADCAST, message._data[1:]),
-            )
-        )
+        self._events.put(('event', (message._data[0],
+                                    Message.Code.EVENT_RX_BROADCAST, message._data[1:])))
 
     def _on_acknowledge(self, message):
-        self._events.put(
-            (
-                "event",
-                (
-                    message._data[0],
-                    Message.Code.EVENT_RX_ACKNOWLEDGED,
-                    message._data[1:],
-                ),
-            )
-        )
+        self._events.put(('event', (message._data[0],
+                                    Message.Code.EVENT_RX_ACKNOWLEDGED, message._data[1:])))
 
     def _on_burst_data(self, message):
 
@@ -107,12 +82,8 @@ class Ant:
 
         # Last sequence (indicated by bit 3)
         if sequence & 0b100 != 0:
-            self._events.put(
-                (
-                    "event",
-                    (channel, Message.Code.EVENT_RX_BURST_PACKET, self._burst_data),
-                )
-            )
+            self._events.put(('event', (channel,
+                                        Message.Code.EVENT_RX_BURST_PACKET, self._burst_data)))
 
     def _worker(self):
 
@@ -129,94 +100,67 @@ class Ant:
 
                 # Only do callbacks for new data. Resent data only indicates
                 # a new channel timeslot.
-                if not (
-                    message._id == Message.ID.BROADCAST_DATA
-                    and message._data == self._last_data
-                ):
+                if not (message._id == Message.ID.BROADCAST_DATA
+                        and message._data == self._last_data):
 
                     # Notifications
-                    if message._id in [
-                        Message.ID.STARTUP_MESSAGE,
-                        Message.ID.SERIAL_ERROR_MESSAGE,
-                    ]:
-                        self._events.put(
-                            ("response", (None, message._id, message._data))
-                        )
+                    if message._id in [Message.ID.STARTUP_MESSAGE,
+                                       Message.ID.SERIAL_ERROR_MESSAGE]:
+                        self._events.put(('response', (None, message._id,
+                                                       message._data)))
+
+                    # #TODO_ fare qualcosa
+                    # elif message._id == Message.ID.EVENT_CHANNEL_CLOSED:
+                    #     print("CLOSED CHANNEL")
                     # Response (no channel)
-                    elif message._id in [
-                        Message.ID.RESPONSE_ANT_VERSION,
-                        Message.ID.RESPONSE_CAPABILITIES,
-                        Message.ID.RESPONSE_SERIAL_NUMBER,
-                        Message.ID.ENABLE_EXT_RX_MESGS,
-                    ]:
-                        self._events.put(
-                            ("response", (None, message._id, message._data))
-                        )
+                    elif message._id in [Message.ID.RESPONSE_ANT_VERSION,
+                                         Message.ID.RESPONSE_CAPABILITIES,
+                                         Message.ID.RESPONSE_SERIAL_NUMBER]:
+                        self._events.put(('response', (None, message._id,
+                                                       message._data)))
                     # Response (channel)
-                    elif message._id in [
-                        Message.ID.RESPONSE_CHANNEL_STATUS,
-                        Message.ID.RESPONSE_CHANNEL_ID,
-                    ]:
-                        self._events.put(
-                            (
-                                "response",
-                                (message._data[0], message._id, message._data[1:]),
-                            )
-                        )
+                    elif message._id in [Message.ID.RESPONSE_CHANNEL_STATUS,
+                                         Message.ID.RESPONSE_CHANNEL_ID]:
+                        self._events.put(('response', (message._data[0],
+                                                       message._id, message._data[1:])))
                     # Response (other)
-                    elif (
-                        message._id == Message.ID.RESPONSE_CHANNEL
-                        and message._data[1] != 0x01
-                    ):
-                        self._events.put(
-                            (
-                                "response",
-                                (message._data[0], message._data[1], message._data[2:]),
-                            )
-                        )
+                    elif (message._id == Message.ID.RESPONSE_CHANNEL
+                          and message._data[1] != 0x01):
+                        self._events.put(('response', (message._data[0],
+                                                       message._data[1], message._data[2:])))
                     # Channel event
-                    elif (
-                        message._id == Message.ID.RESPONSE_CHANNEL
-                        and message._data[1] == 0x01
-                    ):
-                        _logger.debug("Got channel event, %r", message)
-                        self._events.put(
-                            (
-                                "event",
-                                (message._data[0], message._data[1], message._data[2:]),
-                            )
-                        )
                     elif message._id == Message.ID.BROADCAST_DATA:
                         self._on_broadcast(message)
                     elif message._id == Message.ID.ACKNOWLEDGED_DATA:
                         self._on_acknowledge(message)
                     elif message._id == Message.ID.BURST_TRANSFER_DATA:
                         self._on_burst_data(message)
+                    elif message._id == Message.ID.RESPONSE_CHANNEL:
+                        _logger.debug("Got channel event, %r", message)
+                        self._events.put(('event', (message._data[0],
+                                                    message._data[1], message._data[2:])))
                     else:
                         _logger.warning("Got unknown message, %r", message)
                 else:
                     _logger.debug("No new data this period")
 
+                # TRASMETTERE STA ROBA NON CI SERVE (PENSO)
                 # Send messages in queue, on indicated time slot
-                if message._id == Message.ID.BROADCAST_DATA:
-                    time.sleep(0.1)
-                    _logger.debug(
-                        "Got broadcast data, examine queue to see if we should send anything back"
-                    )
-                    if self._message_queue_cond.acquire(blocking=False):
-                        while len(self._message_queue) > 0:
-                            m = self._message_queue.popleft()
-                            self.write_message(m)
-                            _logger.debug(" - sent message from queue, %r", m)
-
-                            if (
-                                m._id != Message.ID.BURST_TRANSFER_DATA
-                                or m._data[0] & 0b10000000
-                            ):  # or m._data[0] == 0:
-                                break
-                        else:
-                            _logger.debug(" - no messages in queue")
-                        self._message_queue_cond.release()
+                # if message._id == Message.ID.BROADCAST_DATA:
+                #     time.sleep(0.1)
+                #     #_logger.debug("Got broadcast data, examine queue to see if we should send anything back")
+                #     if self._message_queue_cond.acquire(blocking=False):
+                #         while len(self._message_queue) > 0:
+                #             m = self._message_queue.popleft()
+                #             self.write_message(m)
+                #             _logger.debug(" - sent message from queue, %r", m)
+                #
+                #             if m._id != Message.ID.BURST_TRANSFER_DATA or \
+                #                     m._data[0] & 0b10000000:  # or m._data[0] == 0:
+                #                 break
+                #         else:
+                #             _logger.debug(" - no messages in queue")
+                #         self._message_queue_cond.release()
 
                 self._last_data = message._data
 
@@ -232,9 +176,9 @@ class Ant:
                 self._events.task_done()
                 (channel, event, data) = event
 
-                if event_type == "response":
+                if event_type == 'response':
                     self.response_function(channel, event, data)
-                elif event_type == "event":
+                elif event_type == 'event':
                     self.channel_event_function(channel, event, data)
                 else:
                     _logger.warning("Unknown message typ '%s': %r", event_type, event)
@@ -253,59 +197,45 @@ class Ant:
     def read_message(self):
         while self._running:
             # If we have a message in buffer already, return it
+            # print("Buffer len: " + str(len(self._buffer)))
+            # _logger.warning("Buffer len: " + str(len(self._buffer)))
             if len(self._buffer) >= 5 and len(self._buffer) >= self._buffer[1] + 4:
-                packet = self._buffer[: self._buffer[1] + 4]
-                self._buffer = self._buffer[self._buffer[1] + 4 :]
+                packet = self._buffer[:self._buffer[1] + 4]
+                self._buffer = self._buffer[self._buffer[1] + 4:]
                 return Message.parse(packet)
             # Otherwise, read some data and call the function again
             else:
                 data = self._driver.read()
                 self._buffer.extend(data)
-                _logger.debug(
-                    "Read data: %s (now have %s in buffer)",
-                    format_list(data),
-                    format_list(self._buffer),
-                )
+                _logger.debug("Read data: %s (now have %s in buffer)",
+                              format_list(data), format_list(self._buffer))
+                _logger.debug("Buffer len: " + str(len(self._buffer)))
 
     # Ant functions
 
     def unassign_channel(self, channel):
         pass
 
-    def assign_channel(self, channel, channelType, networkNumber, ext_assign):
-        if ext_assign is None:
-            message = Message(
-                Message.ID.ASSIGN_CHANNEL, [channel, channelType, networkNumber]
-            )
-        else:
-            message = Message(
-                Message.ID.ASSIGN_CHANNEL,
-                [channel, channelType, networkNumber, ext_assign],
-            )
+    def assign_channel(self, channel, channelType, networkNumber):
+        message = Message(Message.ID.ASSIGN_CHANNEL, [channel, channelType, networkNumber])
         self.write_message(message)
 
     def open_channel(self, channel):
         message = Message(Message.ID.OPEN_CHANNEL, [channel])
         self.write_message(message)
 
-    def open_rx_scan_mode(self):
-        message = Message(Message.ID.OPEN_RX_SCAN_MODE, [0, 1])  # [0-Channel, 1-Enable]
-        self.write_message(message)
-
-    def close_channel(self, channel):
-        _logger.debug("Closing channel %d", channel)
-        message = Message(Message.ID.CLOSE_CHANNEL, [channel])
-        self.write_message(message)
+    # # TODO_: DA TESTARE
+    # def close_channel(self, channel):
+    #     message = Message(Message.ID.CLOSE_CHANNEL, [channel])
+    #     self.write_message(message)
 
     def set_channel_id(self, channel, deviceNum, deviceType, transmissionType):
-        data = array.array(
-            "B", struct.pack("<BHBB", channel, deviceNum, deviceType, transmissionType)
-        )
+        data = array.array('B', struct.pack("<BHBB", channel, deviceNum, deviceType, transmissionType))
         message = Message(Message.ID.SET_CHANNEL_ID, data)
         self.write_message(message)
 
     def set_channel_period(self, channel, messagePeriod):
-        data = array.array("B", struct.pack("<BH", channel, messagePeriod))
+        data = array.array('B', struct.pack("<BH", channel, messagePeriod))
         message = Message(Message.ID.SET_CHANNEL_PERIOD, data)
         self.write_message(message)
 
@@ -315,10 +245,6 @@ class Ant:
 
     def set_channel_rf_freq(self, channel, rfFreq):
         message = Message(Message.ID.SET_CHANNEL_RF_FREQ, [channel, rfFreq])
-        self.write_message(message)
-
-    def enable_extended_messages(self, channel, enable):
-        message = Message(Message.ID.ENABLE_EXT_RX_MESGS, [channel, enable])
         self.write_message(message)
 
     def set_network_key(self, network, key):
@@ -341,23 +267,16 @@ class Ant:
         message = Message(Message.ID.REQUEST_MESSAGE, [channel, messageId])
         self.write_message(message)
 
-    def send_broadcast_data(self, channel, data):
-        assert len(data) == 8
-        message = Message(Message.ID.BROADCAST_DATA, array.array("B", [channel]) + data)
-        self.write_message(message)
-
     def send_acknowledged_data(self, channel, data):
         assert len(data) == 8
-        message = Message(
-            Message.ID.ACKNOWLEDGED_DATA, array.array("B", [channel]) + data
-        )
+        message = Message(Message.ID.ACKNOWLEDGED_DATA,
+                          array.array('B', [channel]) + data)
         self.write_message_timeslot(message)
 
     def send_burst_transfer_packet(self, channel_seq, data, first):
         assert len(data) == 8
-        message = Message(
-            Message.ID.BURST_TRANSFER_DATA, array.array("B", [channel_seq]) + data
-        )
+        message = Message(Message.ID.BURST_TRANSFER_DATA,
+                          array.array('B', [channel_seq]) + data)
         self.write_message_timeslot(message)
 
     def send_burst_transfer(self, channel, data):
@@ -371,13 +290,8 @@ class Ant:
             elif i == packets - 1:
                 sequence = sequence | 0b100
             channel_seq = channel | sequence << 5
-            packet_data = data[i * 8 : i * 8 + 8]
-            _logger.debug(
-                "Send burst transfer, packet %d, seq %d, data %s",
-                i,
-                sequence,
-                packet_data,
-            )
+            packet_data = data[i * 8:i * 8 + 8]
+            _logger.debug("Send burst transfer, packet %d, seq %d, data %s", i, sequence, packet_data)
             self.send_burst_transfer_packet(channel_seq, packet_data, first=i == 0)
 
     def response_function(self, channel, event, data):

@@ -1,31 +1,11 @@
-# Ant
-#
-# Copyright (c) 2012, Gustav Tiger <gustav@tiger.name>
-#
-# Permission is hereby granted, free of charge, to any person obtaining a
-# copy of this software and associated documentation files (the "Software"),
-# to deal in the Software without restriction, including without limitation
-# the rights to use, copy, modify, merge, publish, distribute, sublicense,
-# and/or sell copies of the Software, and to permit persons to whom the
-# Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-# FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-# DEALINGS IN THE SOFTWARE.
-
+from __future__ import absolute_import, print_function
 
 import logging
 
-from ant.base.message import Message
-from ant.easy.exception import TransferFailedException
-from ant.easy.filter import wait_for_event, wait_for_response, wait_for_special
+# import threading
+from ..base.message import Message
+from ..easy.exception import TransferFailedException
+from ..easy.filter import wait_for_event, wait_for_response, wait_for_special
 
 _logger = logging.getLogger("ant.easy.channel")
 
@@ -50,17 +30,13 @@ class Channel:
         return wait_for_event(ok_codes, self._node._events, self._node._event_cond)
 
     def wait_for_response(self, event_id):
-        return wait_for_response(
-            event_id, self._node._responses, self._node._responses_cond
-        )
+        return wait_for_response(event_id, self._node._responses, self._node._responses_cond)
 
     def wait_for_special(self, event_id):
-        return wait_for_special(
-            event_id, self._node._responses, self._node._responses_cond
-        )
+        return wait_for_special(event_id, self._node._responses, self._node._responses_cond)
 
-    def _assign(self, channelType, networkNumber, ext_assign):
-        self._ant.assign_channel(self.id, channelType, networkNumber, ext_assign)
+    def _assign(self, channelType, networkNumber):
+        self._ant.assign_channel(self.id, channelType, networkNumber)
         return self.wait_for_response(Message.ID.ASSIGN_CHANNEL)
 
     def _unassign(self):
@@ -68,15 +44,14 @@ class Channel:
 
     def open(self):
         self._ant.open_channel(self.id)
+        print("Channel open: " + str(self.id))
         return self.wait_for_response(Message.ID.OPEN_CHANNEL)
 
-    def open_rx_scan_mode(self):
-        self._ant.open_rx_scan_mode()
-        return self.wait_for_response(Message.ID.OPEN_RX_SCAN_MODE)
-
-    def close(self):
-        self._ant.close_channel(self.id)
-        return self.wait_for_response(Message.ID.CLOSE_CHANNEL)
+    # #TODO_: DA TESTARE
+    # def close(self):
+    #     self._ant.close_channel(self.id)
+    #     print("Channel close: " + str(self.id))
+    #     return self.wait_for_response(Message.ID.CLOSE_CHANNEL)
 
     def set_id(self, deviceNum, deviceType, transmissionType):
         self._ant.set_channel_id(self.id, deviceNum, deviceType, transmissionType)
@@ -94,10 +69,6 @@ class Channel:
         self._ant.set_channel_rf_freq(self.id, rfFreq)
         return self.wait_for_response(Message.ID.SET_CHANNEL_RF_FREQ)
 
-    def enable_extended_messages(self, enable):
-        self._ant.enable_extended_messages(self.id, enable)
-        return self.wait_for_response(Message.ID.ENABLE_EXT_RX_MESGS)
-
     def set_search_waveform(self, waveform):
         self._ant.set_search_waveform(self.id, waveform)
         return self.wait_for_response(Message.ID.SET_SEARCH_WAVEFORM)
@@ -108,9 +79,8 @@ class Channel:
         _logger.debug("done requesting message %#02x", messageId)
         return self.wait_for_special(messageId)
 
-    def send_broadcast_data(self, data):
-        _logger.debug("send broadcast data %s", self.id)
-        self._ant.send_broadcast_data(self.id, data)
+    def request_closed(self):
+        return self.wait_for_special(Message.ID.EVENT_CHANNEL_CLOSED)
 
     def send_acknowledged_data(self, data):
         try:
@@ -136,3 +106,4 @@ class Channel:
         except TransferFailedException:
             _logger.warning("failed to send burst transfer %s, retrying", self.id)
             self.send_burst_transfer(data)
+
